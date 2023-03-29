@@ -1,0 +1,246 @@
+---
+title: "Subjective mental state and Fatigue, an Investigation into possible paradoxical effects"
+output: 
+  html_document:
+    code_folding: show
+    theme:
+      bg: "#202123"
+      fg: "#B8BCC2"
+      primary: "#EA80FC"
+      secondary: "#00DAC6"
+      base_font:
+        google: Prompt
+      heading_font:
+        google: Proza Libre
+---
+
+```{r setup, include=FALSE}
+# Tidyverse set-up
+if (requireNamespace("thematic")) 
+  thematic::thematic_rmd(font = "auto")
+# Libraries
+set.seed(2023)
+library(tidyverse)
+library(readxl)
+# Datasets
+vas_new <- read_csv("data/main_outcome.csv")
+vas_old <- read_excel("data/demographic_comparison.xlsx")
+# Tidying
+vas_new_selection <- vas_new %>%
+  mutate(selection = case_when(suspicion == "yes" ~ "yes",
+    `qualitative exclusion` == "yes" ~ "yes",
+    TRUE ~ "no"),
+    experiment = "control") %>%
+  select(selection, CON_full, sleep, pr_vas, po_vas, vas_change, experiment)
+
+vas_old_selection <- vas_old %>%
+  rename(pr_vas = `pre-vas`, po_vas = `post-vas`, vas_change = `dif-vas`) %>%
+  mutate(selection = "no",
+    experiment = "experimental") %>%
+  select(selection, age, sleep, pr_vas, po_vas, vas_change, experiment)
+# Joining
+vas_all <- vas_new_selection %>%
+  full_join(vas_old_selection)
+```
+
+Investigation of the questions as set out in the [pre-registration](https://osf.io/fybc9).
+
+# VAS difference confirmation {.tabset}
+
+## Self-aware excluded
+
+n = 12.
+
+Phrases leading to exclusion:
+
+* 20007: `r vas_new$report[3]`
+* 20002: `r vas_new$report[8]`
+
+Are the two experiments different?
+
+```{r include=FALSE, warning=FALSE}
+# Clean away self-selected leavers
+vas_all_clean_model <- vas_all %>%
+  filter(selection == "no") %>%
+  mutate(experiment = recode(experiment, `experimental` = 1, `control` = 0))
+
+model <- lm(vas_change ~ experiment, vas_all_clean_model)
+```
+
+```{r echo=FALSE, warning=FALSE}
+vas_all_clean_plot <- vas_all %>%
+  filter(selection == "no")
+
+p <- ggplot(vas_all_clean_plot, aes(experiment, vas_change, fill=experiment)) +
+  geom_violin(alpha = 0.5) +
+  geom_boxplot() +
+  geom_jitter() +
+  scale_fill_viridis_d()
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+p
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+summary(model)
+```
+
+## Older excluded
+
+Phrases leading to exclusion:
+
+* 20007: `r vas_new$report[3]`
+* 20002: `r vas_new$report[8]`
+
+Are the two experiments different?
+
+```{r include=FALSE, warning=FALSE}
+# Clean away self-selected leavers
+vas_all_clean_model <- vas_all %>%
+  filter(age < 30 | is.na(age)) %>%
+  filter(selection == "no") %>%
+  mutate(experiment = recode(experiment, `experimental` = 1, `control` = 0))
+
+model <- lm(vas_change ~ experiment, vas_all_clean_model)
+```
+
+```{r echo=FALSE, warning=FALSE}
+vas_all_clean_plot <- vas_all %>%
+  filter(selection == "no") %>%
+  filter(age < 30 | is.na(age))
+
+p <- ggplot(vas_all_clean_plot, aes(experiment, vas_change, fill=experiment)) +
+  geom_violin(alpha = 0.5) +
+  geom_boxplot() +
+  geom_jitter() +
+  scale_fill_viridis_d() +
+  ylab("VAS change")
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+p
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+summary(model)
+```
+
+## All
+
+n = 16.
+
+Are the two experiments different?
+
+```{r include=FALSE, warning=FALSE}
+# Clean away self-selected leavers
+vas_all_clean_model <- vas_all %>%
+  mutate(experiment = recode(experiment, `experimental` = 1, `control` = 0))
+
+model <- lm(vas_change ~ experiment, vas_all_clean_model)
+```
+
+```{r echo=FALSE, warning=FALSE}
+vas_all_clean_plot <- vas_all
+
+p <- ggplot(vas_all_clean_plot, aes(experiment, vas_change, fill=experiment)) +
+  geom_violin(alpha = 0.5) +
+  geom_boxplot() +
+  geom_jitter() +
+  scale_fill_viridis_d() +
+  ylab("VAS change")
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+p 
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+summary(model)
+```
+
+# Control Experiment {.tabset}
+
+## Self-aware excluded
+
+```{r echo=FALSE, warning=FALSE}
+vas_test <- vas_all %>%
+  filter(selection == "no", experiment == "control")
+
+model <- t.test(vas_test$po_vas, vas_test$pr_vas, alternative = "greater")
+```
+
+```{r echo=FALSE}
+model
+```
+
+```{r echo=FALSE, warning=FALSE}
+vas_test_clean_plot <- vas_test %>%
+  select(pr_vas, po_vas) %>%
+  pivot_longer(1:2, names_to = "timepoint", values_to = "vas") %>%
+  mutate(timepoint = recode(timepoint,pr_vas = "before", po_vas = "after"))
+
+p <- ggplot(vas_test_clean_plot, aes(reorder(timepoint, vas), vas, fill=timepoint)) +
+  geom_violin(alpha = 0.5) +
+  geom_boxplot() +
+  geom_jitter() +
+  scale_fill_viridis_d() +
+  xlab("Timepoint") +
+  ylab("VAS")
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+p
+```
+
+## All
+
+```{r echo=FALSE, warning=FALSE}
+vas_test <- vas_all %>%
+  filter(experiment == "control")
+
+model <- t.test(vas_test$po_vas, vas_test$pr_vas, alternative = "greater")
+```
+
+```{r echo=FALSE}
+model
+```
+
+```{r echo=FALSE, warning=FALSE}
+vas_test_clean_plot <- vas_test %>%
+  select(pr_vas, po_vas) %>%
+  pivot_longer(1:2, names_to = "timepoint", values_to = "vas") %>%
+  mutate(timepoint = recode(timepoint,pr_vas = "before", po_vas = "after"))
+
+p <- ggplot(vas_test_clean_plot, aes(reorder(timepoint, vas), vas, fill=timepoint)) +
+  geom_violin(alpha = 0.5) +
+  geom_boxplot() +
+  geom_jitter() +
+  scale_fill_viridis_d() +
+  xlab("Timepoint") +
+  ylab("VAS")
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+p
+```
+
+# Personality effects
+
+No relation to conscienciousness.
+
+```{r echo=FALSE, warning=FALSE}
+model <- lm(vas_change ~ CON_full, vas_test)
+```
+
+```{r echo=FALSE}
+summary(model)
+```
